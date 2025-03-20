@@ -113,9 +113,6 @@ The application includes several enhancements to improve age prediction accuracy
 - If the webcam fails to start, try refreshing the page or checking your browser's settings
 - Age prediction may be less accurate for certain age groups or in poor lighting conditions
 
-## License
-
-This project is licensed under the MIT License - see the LICENSE file for details.
 
 ## Acknowledgments
 
