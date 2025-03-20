@@ -1,0 +1,481 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BioSense</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 20px;
+            line-height: 1.6;
+            color: #333;
+            background-color: #f7f9fc;
+        }
+        h1 {
+            text-align: center;
+            color: #2c3e50;
+            margin-bottom: 30px;
+        }
+        .container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 20px;
+            justify-content: center;
+        }
+        .video-container, .result-container {
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        .video-container {
+            flex: 1;
+            min-width: 320px;
+            text-align: center;
+        }
+        .result-container {
+            flex: 1;
+            min-width: 320px;
+            max-height: 600px;
+            overflow-y: auto;
+        }
+        #canvas {
+            display: none;
+        }
+        #video {
+            width: 100%;
+            max-width: 640px;
+            border-radius: 4px;
+            border: 1px solid #ddd;
+        }
+        .button-container {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            margin-top: 15px;
+        }
+        button {
+            background-color: #3498db;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            font-size: 16px;
+            cursor: pointer;
+            border-radius: 4px;
+            transition: background-color 0.3s;
+        }
+        button:hover {
+            background-color: #2980b9;
+        }
+        button:disabled {
+            background-color: #95a5a6;
+            cursor: not-allowed;
+        }
+        button.success {
+            background-color: #2ecc71;
+        }
+        button.success:hover {
+            background-color: #27ae60;
+        }
+        button.danger {
+            background-color: #e74c3c;
+        }
+        button.danger:hover {
+            background-color: #c0392b;
+        }
+        .face-box {
+            border: 2px solid #3498db;
+            position: absolute;
+            z-index: 2;
+        }
+        #face-display {
+            position: relative;
+            margin: 20px auto;
+            display: inline-block;
+        }
+        #snapshot {
+            max-width: 100%;
+            border-radius: 4px;
+            display: none;
+        }
+        .detection-item {
+            background-color: #f1f8ff;
+            padding: 10px 15px;
+            margin: 10px 0;
+            border-radius: 4px;
+            border-left: 3px solid #3498db;
+        }
+        .loading {
+            text-align: center;
+            margin: 20px 0;
+            display: none;
+        }
+        .loading:after {
+            content: ' .';
+            animation: dots 1s steps(5, end) infinite;
+        }
+        @keyframes dots {
+            0%, 20% { color: rgba(0,0,0,0); text-shadow: 0.25em 0 0 rgba(0,0,0,0), 0.5em 0 0 rgba(0,0,0,0); }
+            40% { color: #333; text-shadow: 0.25em 0 0 rgba(0,0,0,0), 0.5em 0 0 rgba(0,0,0,0); }
+            60% { text-shadow: 0.25em 0 0 #333, 0.5em 0 0 rgba(0,0,0,0); }
+            80%, 100% { text-shadow: 0.25em 0 0 #333, 0.5em 0 0 #333; }
+        }
+        .error {
+            color: #e74c3c;
+            font-weight: bold;
+        }
+        .placeholder {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background-color: #f5f5f5;
+            color: #95a5a6;
+            font-size: 18px;
+            height: 360px;
+            border: 1px dashed #bdc3c7;
+            border-radius: 4px;
+        }
+        .confidence-bar {
+            height: 10px;
+            background-color: #ecf0f1;
+            border-radius: 5px;
+            margin: 5px 0;
+            position: relative;
+            overflow: hidden;
+        }
+        .confidence-level {
+            height: 100%;
+            background-color: #3498db;
+            border-radius: 5px;
+        }
+        .confidence-high {
+            background-color: #2ecc71;
+        }
+        .confidence-medium {
+            background-color: #f39c12;
+        }
+        .confidence-low {
+            background-color: #e74c3c;
+        }
+        .age-details {
+            margin-top: 10px;
+            padding: 10px;
+            background-color: #ecf0f1;
+            border-radius: 4px;
+            font-size: 0.9em;
+        }
+        .age-details-toggle {
+            color: #3498db;
+            cursor: pointer;
+            text-decoration: underline;
+            font-size: 0.9em;
+            display: block;
+            margin-top: 5px;
+        }
+        .top-prediction {
+            font-weight: bold;
+            color: #2c3e50;
+        }
+        .collapsible-content {
+            display: none;
+            margin-top: 10px;
+        }
+    </style>
+</head>
+<body>
+    <h1>BioSense</h1>
+    
+    <div class="container">
+        <div class="video-container">
+            <h2>Webcam Feed</h2>
+            <div id="video-placeholder" class="placeholder">
+                Click "Start Webcam" to activate camera
+            </div>
+            <video id="video" autoplay style="display: none;"></video>
+            <div class="button-container">
+                <button id="start-webcam">Start Webcam</button>
+                <button id="stop-webcam" disabled class="danger">Stop Webcam</button>
+                <button id="capture" disabled>Analyze Face</button>
+            </div>
+            
+            <div id="face-display">
+                <img id="snapshot" alt="Snapshot" />
+                <!-- Face boxes will be added here dynamically -->
+            </div>
+        </div>
+        
+        <div class="result-container">
+            <h2>Detection Results</h2>
+            <div id="loading" class="loading">Processing</div>
+            <div id="results"></div>
+        </div>
+    </div>
+    
+    <canvas id="canvas"></canvas>
+    
+    <script>
+        // Get DOM elements
+        const video = document.getElementById('video');
+        const videoPlaceholder = document.getElementById('video-placeholder');
+        const canvas = document.getElementById('canvas');
+        const startWebcamBtn = document.getElementById('start-webcam');
+        const stopWebcamBtn = document.getElementById('stop-webcam');
+        const captureBtn = document.getElementById('capture');
+        const results = document.getElementById('results');
+        const snapshot = document.getElementById('snapshot');
+        const faceDisplay = document.getElementById('face-display');
+        const loading = document.getElementById('loading');
+        
+        // Flag to track webcam status
+        let webcamActive = false;
+        let stream = null;
+        
+        // Initialize webcam
+        async function initWebcam() {
+            try {
+                // Request camera access
+                stream = await navigator.mediaDevices.getUserMedia({ 
+                    video: { width: 640, height: 480 } 
+                });
+                
+                // Set video source and show it
+                video.srcObject = stream;
+                video.style.display = 'block';
+                videoPlaceholder.style.display = 'none';
+                
+                // Update UI elements
+                webcamActive = true;
+                captureBtn.disabled = false;
+                stopWebcamBtn.disabled = false;
+                startWebcamBtn.textContent = 'Webcam Active';
+                startWebcamBtn.classList.add('success');
+                startWebcamBtn.disabled = true;
+                
+                // Add message in results panel
+                results.innerHTML = '<div>Webcam activated successfully. Click "Analyze Face" when ready.</div>';
+            } catch (err) {
+                results.innerHTML = `<div class="error">Error accessing webcam: ${err.message}</div>`;
+                startWebcamBtn.disabled = false;
+            }
+        }
+        
+        // Stop webcam
+        function stopWebcam() {
+            if (stream) {
+                // Stop all tracks
+                stream.getTracks().forEach(track => {
+                    track.stop();
+                });
+                
+                // Reset video element
+                video.srcObject = null;
+                video.style.display = 'none';
+                videoPlaceholder.style.display = 'flex';
+                
+                // Reset UI elements
+                webcamActive = false;
+                stream = null;
+                captureBtn.disabled = true;
+                stopWebcamBtn.disabled = true;
+                startWebcamBtn.textContent = 'Start Webcam';
+                startWebcamBtn.classList.remove('success');
+                startWebcamBtn.disabled = false;
+                
+                // Reset displays
+                snapshot.style.display = 'none';
+                faceDisplay.querySelectorAll('.face-box').forEach(box => box.remove());
+                
+                // Add message
+                results.innerHTML = '<div>Webcam stopped. Click "Start Webcam" to begin again.</div>';
+            }
+        }
+        
+        // Get CSRF token from cookies
+        function getCSRFToken() {
+            const cookieValue = document.cookie
+                .split('; ')
+                .find(row => row.startsWith('csrftoken='))
+                ?.split('=')[1];
+            return cookieValue || '';
+        }
+        
+        // Format confidence value to number
+        function getConfidenceValue(confString) {
+            return parseFloat(confString.replace('%', ''));
+        }
+        
+        // Get confidence color class based on value
+        function getConfidenceClass(value) {
+            if (value >= 70) return 'confidence-high';
+            if (value >= 40) return 'confidence-medium';
+            return 'confidence-low';
+        }
+        
+        // Toggle display of collapsible content
+        function toggleDetails(element) {
+            const content = element.nextElementSibling;
+            if (content.style.display === 'block') {
+                content.style.display = 'none';
+                element.textContent = 'Show age prediction details';
+            } else {
+                content.style.display = 'block';
+                element.textContent = 'Hide age prediction details';
+            }
+        }
+        
+        // Event listener for Start Webcam button
+        startWebcamBtn.addEventListener('click', function() {
+            if (!webcamActive) {
+                this.textContent = 'Requesting access...';
+                this.disabled = true;
+                results.innerHTML = '<div>Requesting webcam access...</div>';
+                initWebcam();
+            }
+        });
+        
+        // Event listener for Stop Webcam button
+        stopWebcamBtn.addEventListener('click', function() {
+            if (webcamActive) {
+                stopWebcam();
+            }
+        });
+        
+        // Process capture
+        captureBtn.addEventListener('click', async function() {
+            // If webcam is not active, we shouldn't be able to click this button
+            if (!webcamActive) return;
+            
+            // Clear previous results
+            results.innerHTML = '';
+            faceDisplay.querySelectorAll('.face-box').forEach(box => box.remove());
+            loading.style.display = 'block';
+            
+            // Capture video frame
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            const context = canvas.getContext('2d');
+            context.drawImage(video, 0, 0, canvas.width, canvas.height);
+            
+            // Display snapshot
+            snapshot.src = canvas.toDataURL('image/jpeg');
+            snapshot.style.display = 'block';
+            
+            // Convert to blob
+            canvas.toBlob(async blob => {
+                try {
+                    // Create form data and append image
+                    const formData = new FormData();
+                    formData.append('image', blob, 'webcam.jpg');
+                    
+                    // Send to server
+                    const response = await fetch('/detect/', {
+                        method: 'POST',
+                        body: formData,
+                        headers: {
+                            'X-CSRFToken': getCSRFToken()
+                        }
+                    });
+                    
+                    const data = await response.json();
+                    loading.style.display = 'none';
+                    
+                    // Handle response
+                    if (data.error) {
+                        results.innerHTML = `<div class="error">Error: ${data.error}</div>`;
+                        return;
+                    }
+                    
+                    if (data.detections && data.detections.length > 0) {
+                        // Take only the first detection (primary face)
+                        const person = data.detections[0];
+                        
+                        // Add face box only for the primary face
+                        const box = person.face_box;
+                        const faceBox = document.createElement('div');
+                        faceBox.className = 'face-box';
+                        faceBox.style.width = (box.x2 - box.x1) + 'px';
+                        faceBox.style.height = (box.y2 - box.y1) + 'px';
+                        faceBox.style.top = box.y1 + 'px';
+                        faceBox.style.left = box.x1 + 'px';
+                        faceDisplay.appendChild(faceBox);
+                        
+                        // Get confidence values
+                        const genderConfidence = getConfidenceValue(person.gender_confidence);
+                        const ageConfidence = getConfidenceValue(person.age_confidence);
+                        const secondAgeConfidence = getConfidenceValue(person.second_prediction.confidence);
+                        
+                        // Create a combined age prediction based on confidence
+                        let agePredictionText = person.age;
+                        if (ageConfidence < 60 && secondAgeConfidence > 20) {
+                            agePredictionText = `${person.age} or possibly ${person.second_prediction.age}`;
+                        }
+                        
+                        // Create detection info HTML
+                        let resultsHTML = `
+                            <div class="detection-item">
+                                <h3>Detection Results</h3>
+                                
+                                <p><strong>Gender:</strong> ${person.gender}</p>
+                                <div class="confidence-bar">
+                                    <div class="confidence-level ${getConfidenceClass(genderConfidence)}" 
+                                         style="width: ${genderConfidence}%"></div>
+                                </div>
+                                <p>Confidence: ${person.gender_confidence}</p>
+                                
+                                <p><strong>Age:</strong> ${agePredictionText}</p>
+                                <div class="confidence-bar">
+                                    <div class="confidence-level ${getConfidenceClass(ageConfidence)}" 
+                                         style="width: ${ageConfidence}%"></div>
+                                </div>
+                                <p>Confidence: ${person.age_confidence}</p>
+                                
+                                <span class="age-details-toggle" onclick="toggleDetails(this)">Show age prediction details</span>
+                                <div class="collapsible-content">
+                                    <div class="age-details">
+                                        <p><strong>Top predictions:</strong></p>
+                                        <p class="top-prediction">1. ${person.age} (${person.age_confidence})</p>
+                                        <p>2. ${person.second_prediction.age} (${person.second_prediction.confidence})</p>
+                                        
+                                        <p><strong>All age group confidences:</strong></p>
+                                        <ul>
+                                            ${person.all_age_confidences.map(ageConf => `
+                                                <li>${ageConf.age_group}: ${ageConf.confidence}</li>
+                                            `).join('')}
+                                        </ul>
+                                    </div>
+                                </div>
+                                
+                                <p><strong>Face Detection Confidence:</strong> ${person.face_confidence}</p>
+                            </div>
+                        `;
+                        
+                        results.innerHTML = resultsHTML;
+                        
+                        // Add onclick handler to toggle elements
+                        document.querySelectorAll('.age-details-toggle').forEach(toggle => {
+                            toggle.addEventListener('click', function() {
+                                toggleDetails(this);
+                            });
+                        });
+                    } else {
+                        results.innerHTML = '<div class="error">No faces detected.</div>';
+                    }
+                } catch (error) {
+                    loading.style.display = 'none';
+                    results.innerHTML = `<div class="error">Error: ${error.message}</div>`;
+                }
+            }, 'image/jpeg', 0.95);
+        });
+        
+        // Clean up when page unloads
+        window.addEventListener('beforeunload', function() {
+            if (webcamActive) {
+                stopWebcam();
+            }
+        });
+    </script>
+</body>
+</html>
