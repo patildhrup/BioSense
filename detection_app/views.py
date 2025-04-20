@@ -43,6 +43,14 @@ def index(request):
     """Render the main page with the webcam interface."""
     return render(request, 'index.html')
 
+def landing(request):
+    """Render the landing page."""
+    return render(request, 'landing.html')
+
+def privacy(request):
+    """Render the privacy policy page."""
+    return render(request, 'privacy.html')
+
 def get_face_with_padding(frame, x1, y1, x2, y2, padding_ratio=FACE_PADDING_RATIO):
     """Extract face with padding for better age/gender prediction."""
     height, width = frame.shape[:2]

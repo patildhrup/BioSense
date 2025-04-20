@@ -91,7 +91,7 @@ This application uses pre-trained models from OpenCV's DNN module:
   - (4-6)
   - (8-12)
   - (15-20)
-  - (25-32)
+  - (21-32)
   - (38-43)
   - (48-53)
   - (60-100)
